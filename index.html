@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<link href="style.css?1500" rel="stylesheet">
+		<title>ISTHEYAWAKE</title>
+
+	</head>
+	<body>
+		<input id="pac-input" class="controls" type="text" placeholder="Search Box">
+		<div id="worldmap" data-tap-disabled="true"></div>
+		<script>
+			var worldmap;
+			var marker;
+            var uluru = {lat: 0, lng: 0};
+			function moveMarker(latitude,longitude){
+                uluru.lat = latitude;
+                uluru.lng = longitude;
+                worldmap.createMarker();
+                getTimeAtCoords(latitude,longitude);
+			}
+			function getTimeAtCoords(latitude,longitude){
+                var request = "https://maps.googleapis.com/maps/api/timezone/json?location="+ latitude +"," + longitude + "&timestamp=" + new Date().getTime()/100 + "&key=AIzaSyAiolIZk3feh4_wyvkoxgsNYe3XJ5P-yaI";
+                var xhttp = new XMLHttpRequest();
+                xhttp.onreadystatechange = function() {
+                    if (this.readyState == 4 && this.status == 200) {
+                        var x = this.responseText;
+                        x = JSON.parse(x);
+						var nd = toCorrectTime(new Date(),x.rawOffset, x.dstOffset);
+                        var weather = "http://api.openweathermap.org/data/2.5/weather?lat="+ latitude +"&lon=" + longitude + "&appid=33a2896958ef3c6ecdc57f913471a03f";
+                        var xhttp = new XMLHttpRequest();
+                        xhttp.onreadystatechange = function() {
+                            if (this.readyState == 4 && this.status == 200) {
+                                var w = this.responseText;
+                                w = JSON.parse(w);
+                                var sunrise = toCorrectTime(new Date(w.sys.sunrise*1000),x.rawOffset, x.dstOffset);
+                                var sunset = toCorrectTime(new Date(w.sys.sunset*1000),x.rawOffset, x.dstOffset);
+                                console.log(x);
+                                console.log(w);
+                                window.location = "./result.html?time="+nd + "&name=" + x.timeZoneName + "&temp=" + w.main.temp + "&humidity=" + w.main.humidity + "&sunrise=" + sunrise + "&sunset=" + sunset + "&winddeg=" + w.wind.deg + "&windspeed=" + w.wind.speed + "&weatherdesc=" + w.weather[0].description + "&weather=" + w.weather[0].main;
+                            }
+                        };
+                        xhttp.open("GET", weather, true);
+                        xhttp.send();
+                    }
+                };
+                xhttp.open("GET", request, true);
+                xhttp.send();
+
+			}
+			function toCorrectTime(date,rawOffset,dstOffset){
+                var utc = date.getTime() + (date.getTimezoneOffset() *60000  );
+                var nd = (utc/1000 + rawOffset+ dstOffset)*1000;
+                return nd;
+			}
+			function initMap(){
+                worldmap = new MyMap();
+			}
+			function MyMap() {
+
+                this.map = new google.maps.Map(document.getElementById('worldmap'), {
+                    zoom: 3,
+                    center: uluru
+                });
+                this.createMarker = function() {
+                    marker = new google.maps.Marker({
+                        position: uluru,
+                        map: this.map
+                    });
+                }
+                google.maps.event.addListener(this.map, "click", function (event) {
+                    var latitude = event.latLng.lat();
+                    var longitude = event.latLng.lng();
+					moveMarker(latitude,longitude);
+
+                }); //end addListener
+                var input = document.getElementById('pac-input');
+                var searchBox = new google.maps.places.SearchBox(input);
+                this.map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+
+                // Bias the SearchBox results towards current map's viewport.
+                this.map.addListener('bounds_changed', function() {
+                    searchBox.setBounds(worldmap.map.getBounds());
+                });
+
+                var markers = [];
+                // Listen for the event fired when the user selects a prediction and retrieve
+                // more details for that place.
+                searchBox.addListener('places_changed', function() {
+                    var places = searchBox.getPlaces();
+
+                    if (places.length == 0) {
+                        return;
+                    }
+
+                    // Clear out the old markers.
+                    markers.forEach(function(marker) {
+                        marker.setMap(null);
+                    });
+                    markers = [];
+
+                    // For each place, get the icon, name and location.
+                    var bounds = new google.maps.LatLngBounds();
+                    places.forEach(function(place) {
+                        if (!place.geometry) {
+                            console.log("Returned place contains no geometry");
+                            return;
+                        }
+                        var icon = {
+                            url: place.icon,
+                            size: new google.maps.Size(71, 71),
+                            origin: new google.maps.Point(0, 0),
+                            anchor: new google.maps.Point(17, 34),
+                            scaledSize: new google.maps.Size(25, 25)
+                        };
+                        console.log(place.geometry.location.lat);
+                        moveMarker(place.geometry.location.lat(),place.geometry.location.lng());
+                        // Create a marker for each place.
+                        markers.push(new google.maps.Marker({
+                            map: worldmap.map,
+                            icon: icon,
+                            title: place.name,
+                            position: place.geometry.location
+                        }));
+
+                        if (place.geometry.viewport) {
+                            // Only geocodes have viewport.
+                            bounds.union(place.geometry.viewport);
+                        } else {
+                            bounds.extend(place.geometry.location);
+                        }
+                    });
+                    worldmap.map.fitBounds(bounds);
+                });
+			}
+
+		</script>
+		<script async defer
+				src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDRX4Auwz6AX7WUhL97PBrVJ88lwDNpIcs&libraries=places&callback=initMap">
+		</script>
+	</body>
+</html>
